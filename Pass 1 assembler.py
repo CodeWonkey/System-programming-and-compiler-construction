@@ -1,67 +1,81 @@
-symbol_table = {}
+class AssemblerPass1:
+    def __init__(self):
+        self.symbol_table = {}
+        self.opcode_table = {}
+        self.literals_table = {}
 
-object_code = []
+    def process_assembly(self, assembly_code):
+        assembly_lines = assembly_code.split('\n')
+        location_counter = 0
 
-def pass1(source_code):
-    locctr = 0  
-    for line in source_code:
-        line = line.strip()  
-        if line:  
-            fields = line.split()  
-            label = fields[0]
-            opcode = fields[1]
+        for line in assembly_lines:
+            tokens = line.split()
+            if len(tokens) == 0:
+                continue
 
-            if label.endswith(':'):
-                label = label[:-1]  
-                symbol_table[label] = locctr  
-
-            if opcode == 'WORD':
-                locctr += 3 
-                object_code.append(f"{opcode} {fields[2]}")  
-            elif opcode == 'RESW':
-                locctr += 3 * int(fields[2])  
-                object_code.append(f"{opcode} {fields[2]}")  
-            elif opcode == 'RESB':
-                locctr += int(fields[2])  
-                object_code.append(f"{opcode} {fields[2]}")  
-            elif opcode == 'BYTE':
-                if fields[2].startswith('X'):
-                    locctr += len(fields[2]) // 2  
-                    object_code.append(f"{opcode} {fields[2]}")  
+            # Check for symbol
+            if len(tokens) >= 2 and tokens[1] == 'DS':
+                self.symbol_table[tokens[0]] = location_counter
+                if len(tokens) == 3:
+                    location_counter += int(tokens[2])
                 else:
-                    locctr += len(fields[2]) - 3  
-                    object_code.append(f"{opcode} {fields[2]}")  
+                    location_counter += 1
             else:
-                locctr += 3  
-                object_code.append(f"{opcode}")  
+                if tokens[0] not in ['START', 'END']:
+                    self.symbol_table[tokens[0]] = location_counter
+                if tokens[0] == 'LTORG':
+                    for literal, addr in self.literals_table.items():
+                        if addr == None:
+                            self.literals_table[literal] = location_counter
+                            location_counter += 1
+                elif tokens[0] == 'START':
+                    location_counter = int(tokens[1])
+                elif tokens[0] == 'END':
+                    for literal, addr in self.literals_table.items():
+                        if addr == None:
+                            self.literals_table[literal] = location_counter
+                            location_counter += 1
+                    break
+                else:
+                    location_counter += 1
 
-    print("Symbol Table:")
-    if symbol_table:
-        for symbol, address in symbol_table.items():
-            print(f"{symbol}: {address}")
-    else:
-        print("No symbols found.")
+                # Check for opcode
+                if len(tokens) >= 2:
+                    self.opcode_table[tokens[0]] = tokens[1]
 
-    print("\nObject Code:")
-    if object_code:
-        for obj in object_code:
-            print(obj)
-    else:
-        print("No object code generated.")
+                # Check for literals
+                for i in range(len(tokens)):
+                    if '=' in tokens[i]:
+                        literal = tokens[i].split('=')[1]
+                        if literal not in self.literals_table:
+                            self.literals_table[literal] = None
 
-source_code = [
-    "COPY START 1000",
-    "FIRST RESW 4",
-    "CBLOCK RESW 1",
-    "FIELD1 RESM 1",
-    "FIELD2 RESM 1",
-    "FIELD3 RESM 1",
-    "CEND RESW 1",
-    "SECOND RESW 10",
-    "THIRD WORD 5",
-    "BUFFER BYTE X'F1'",
-    "BUFFER BYTE C'EOF'",
-    "ALPHA BYTE 'AB'",
-    "END COPY"
-]
-pass1(source_code)
+    def display_tables(self):
+        print("Symbol Table:")
+        print("{:<10} {:<10}".format("Symbol", "Address"))
+        for symbol, address in self.symbol_table.items():
+            print("{:<10} {:<10}".format(symbol, address))
+        
+        print("\nOpcode Table:")
+        print("{:<10} {:<10}".format("Opcode", "Value"))
+        for opcode, value in self.opcode_table.items():
+            print("{:<10} {:<10}".format(opcode, value))
+        
+        print("\nLiterals Table:")
+        print("{:<10} {:<10}".format("Literal", "Address"))
+        for literal, address in self.literals_table.items():
+            print("{:<10} {:<10}".format(literal, address))
+
+
+if __name__ == "__main__":
+    assembler = AssemblerPass1()
+    assembly_code = """
+    START 1000
+    LOOP ADD AREG, ='5'
+    MOV BREG, ='2'
+    DS C, 1
+    LTORG
+    END
+    """
+    assembler.process_assembly(assembly_code)
+    assembler.display_tables()
