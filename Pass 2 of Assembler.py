@@ -1,51 +1,51 @@
-def pass2(symbol_table, object_code):
-    final_object_code = []  
+class AssemblerPass2:
+    def __init__(self, assembly_code, symbol_table, opcode_table, literals_table):
+        self.assembly_code = assembly_code
+        self.symbol_table = symbol_table
+        self.opcode_table = opcode_table
+        self.literals_table = literals_table
+        self.object_code = []
 
-    for line in object_code:
-        fields = line.split()  
-        opcode = fields[0]
+    def process_assembly(self):
+        for line in self.assembly_code.split('\n'):
+            tokens = line.split()
+            if not tokens:
+                continue
+            mnemonic = tokens[0]
+            if mnemonic == 'LTORG':
+                for literal, address in self.literals_table.items():
+                    if address is None:
+                        self.object_code.append(literal)
+                        self.literals_table[literal] = len(self.object_code) - 1
+            elif mnemonic != 'START':
+                operand = tokens[1].split(',')[0]
+                if operand in self.symbol_table:
+                    self.object_code.append(self.opcode_table[mnemonic] + str(self.symbol_table[operand]))
+                elif operand in self.literals_table:
+                    self.object_code.append(self.opcode_table[mnemonic] + str(self.literals_table[operand]))
+                else:
+                    self.object_code.append(self.opcode_table[mnemonic])
 
-        if len(fields) > 1:
-            operand = fields[1]
+    def generate_object_code(self):
+        return '\n'.join(self.object_code)
 
-            if operand in symbol_table:
-                operand_value = symbol_table[operand]
-            else:
-                try:
-                    operand_value = int(operand)  
-                except ValueError:
-                    operand_value = 0  
 
-            final_object_code.append(f"{opcode} {operand_value}")
-        else:
-            final_object_code.append(f"{opcode}")
+if __name__ == "__main__":
+    symbol_table = {'LOOP': 1000, 'MOV': 1001, 'DS': 1002, 'LTORG': 1003}
+    opcode_table = {'START': '1000', 'LOOP': 'ADD,AREG', 'MOV': 'MOV,BREG', 'DS': 'DS,C'}
+    literals_table = {"'5'": 1003, "'2'": 1004}
 
-    print("Final Object Code:")
-    for obj in final_object_code:
-        print(obj)
+    assembly_code = """
+    START 1000
+    LOOP ADD, AREG
+    MOV MOV, BREG
+    DS DS, C
+    LTORG
+    """
 
-symbol_table = {
-    "FIRST": 1000,
-    "CBLOCK": 1012,
-    "CEND": 1015,
-    "SECOND": 1018,
-    "THIRD": 1048,
-    "BUFFER": 1051,
-    "ALPHA": 1053
-}
+    assembler_pass2 = AssemblerPass2(assembly_code, symbol_table, opcode_table, literals_table)
+    assembler_pass2.process_assembly()
+    object_code = assembler_pass2.generate_object_code()
 
-object_code = [
-    "RESW 4",
-    "RESW 1",
-    "RESM 1",
-    "RESM 1",
-    "RESM 1",
-    "RESW 1",
-    "RESW 10",
-    "WORD 5",
-    "BYTE X'F1'",
-    "BYTE C'EOF'",
-    "BYTE 'AB'"
-]
-
-pass2(symbol_table, object_code)
+    print("Object Code:")
+    print(object_code)
